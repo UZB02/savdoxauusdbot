@@ -100,23 +100,28 @@ ssh -i /path/to/ssh-key.key ubuntu@SIZNING_PUBLIC_IP
 
 ```bash
 sudo apt update
-sudo apt install -y python3-pip python3-venv unzip
+sudo apt install -y python3-pip python3-venv git
 ```
 
 ### 3. Loyihani serverga yuklash
 
-O'z kompyuteringizda (loyiha papkasi joylashgan joyda), yangi terminalda:
+Loyiha GitHub'da joylashgan (https://github.com/UZB02/savdoxauusdbot), shuning
+uchun kompyuteringizdan fayl ko'chirish (`scp`) shart emas — to'g'ridan-to'g'ri
+server terminalida yuklab oling:
 
 ```bash
-scp -i /path/to/ssh-key.key -r gold_signal_bot ubuntu@SIZNING_PUBLIC_IP:/home/ubuntu/
+git clone https://github.com/UZB02/savdoxauusdbot.git gold_signal_bot
+cd gold_signal_bot
 ```
+
+> Eslatma: `git clone` `.env`, `data/` kabi lokal (gitignore qilingan) fayllarni
+> olib kelmaydi — bu aynan kerakli holat, chunki serverda `.env` alohida
+> to'ldiriladi (5-qadam) va `data/` bot birinchi marta ishga tushganda
+> avtomatik yaratiladi.
 
 ### 4. Serverda kutubxonalarni o'rnatish
 
-Qaytadan server terminaliga o'ting:
-
 ```bash
-cd /home/ubuntu/gold_signal_bot
 pip install -r requirements.txt --break-system-packages
 ```
 
@@ -151,9 +156,11 @@ Shu bilan bot serverda 24/7 ishlaydi — kompyuteringizni o'chirsangiz ham, hatt
 
 ### Botni yangilash kerak bo'lsa
 
-Fayllarni yangilagach:
+Kodga o'zgartirish kiritib, GitHub'ga push qilgach, serverda:
 
 ```bash
+cd /home/ubuntu/gold_signal_bot
+git pull
 sudo systemctl restart gold-signal-bot
 ```
 
@@ -185,13 +192,8 @@ Brauzer SSH oynasida:
 
 ```bash
 sudo apt update
-sudo apt install -y python3-pip unzip
-```
-
-Loyiha zip faylini yuklash uchun, brauzer SSH oynasidagi yuqori o'ng burchakdagi **"Upload file"** (bulut belgisi) tugmasidan `gold_signal_bot.zip` faylini yuklang, so'ng:
-
-```bash
-unzip gold_signal_bot.zip
+sudo apt install -y python3-pip git
+git clone https://github.com/UZB02/savdoxauusdbot.git gold_signal_bot
 cd gold_signal_bot
 pip install -r requirements.txt --break-system-packages
 cp .env.example .env
