@@ -21,8 +21,15 @@ Ishga tushirish:
 import logging
 import time
 
-from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+)
 
 import config
 import data_fetcher
@@ -51,6 +58,32 @@ SCHEDULER_TICK_SECONDS = 30
 # yuborilib, foydalanuvchini bezovta qilmasligi uchun.
 _last_decision = {"decision": None}
 
+# API limiti tugagani haqida xabar faqat bir marta (limit tugagan zahoti)
+# yuborilishi, har tekshiruvda qayta-qayta yuborilmasligi uchun holatni
+# shu yerda saqlaymiz.
+_api_limit_state = {"active": False}
+
+RATE_LIMIT_MESSAGE = (
+    "⚠️ Twelve Data API so'rovlar limiti tugadi.\n\n"
+    "Bot vaqtincha yangi narx ma'lumotini ololmayapti. Bu odatda bepul "
+    "tarifning kunlik so'rov chegarasiga yetilganda yuz beradi va limit "
+    "tiklangach avtomatik hal bo'ladi — hech narsa qilish shart emas."
+)
+RATE_LIMIT_RECOVERED_MESSAGE = (
+    "✅ API limiti tiklandi — bot tahlilni yana avvalgidek davom ettirmoqda."
+)
+
+# Har safar buyruq yozish noqulay bo'lmasligi uchun, chat oynasining
+# pastida doimiy turadigan tugmalar (reply keyboard). /start bilan bir
+# marta yuborilgach, foydalanuvchi ularni yopmaguncha doimo ko'rinib turadi.
+BTN_STATUS = "📊 Holat"
+BTN_SETTINGS = "⚙️ Sozlamalar"
+MAIN_MENU_KEYBOARD = ReplyKeyboardMarkup(
+    [[BTN_STATUS, BTN_SETTINGS]],
+    resize_keyboard=True,
+    is_persistent=True,
+)
+
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_registry.add_chat_id(update.effective_chat.id)
@@ -61,8 +94,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Sham intervali: {s['INTERVAL']}\n"
         f"Tekshirish chastotasi: har {s['CHECK_EVERY_SECONDS'] // 60} daqiqada\n\n"
         "Faqat KUCHLI signal chiqqanda sizga xabar yuboraman.\n\n"
-        "/status — joriy holat va aniqlik statistikasini ko'rish\n"
-        "/settings — sozlamalarni tugmalar orqali o'zgartirish"
+        f"Pastdagi {BTN_STATUS} / {BTN_SETTINGS} tugmalaridan foydalaning — "
+        "yozish shart emas.",
+        reply_markup=MAIN_MENU_KEYBOARD,
     )
 
 
@@ -84,7 +118,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📊 Joriy indikator og'irliklari:\n{weights_text}\n\n"
         f"📈 Statistika:\n{stats_text}\n\n"
         f"Oxirgi qaror: {_last_decision['decision'] or 'hali yo`q'}\n\n"
-        "Sozlamalarni o'zgartirish uchun /settings yozing."
+        f"Sozlamalarni o'zgartirish uchun {BTN_SETTINGS} tugmasini bosing."
     )
 
 
@@ -138,6 +172,28 @@ def format_signal_message(decision: str, score: float, votes, price: float, cand
     )
 
 
+async def _notify_all(context: ContextTypes.DEFAULT_TYPE, text: str):
+    chat_ids = chat_registry.load_chat_ids()
+    for chat_id in chat_ids:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=text)
+        except Exception:
+            logger.exception("Xabar yuborishda xatolik (chat_id=%s)", chat_id)
+
+
+async def _handle_rate_limit(context: ContextTypes.DEFAULT_TYPE, error: Exception):
+    logger.warning("Twelve Data API limiti tugadi: %s", error)
+    if not _api_limit_state["active"]:
+        _api_limit_state["active"] = True
+        await _notify_all(context, RATE_LIMIT_MESSAGE)
+
+
+async def _handle_rate_limit_recovered(context: ContextTypes.DEFAULT_TYPE):
+    if _api_limit_state["active"]:
+        _api_limit_state["active"] = False
+        await _notify_all(context, RATE_LIMIT_RECOVERED_MESSAGE)
+
+
 async def analyze_market(context: ContextTypes.DEFAULT_TYPE):
     try:
         symbol = settings_manager.get("SYMBOL")
@@ -145,6 +201,7 @@ async def analyze_market(context: ContextTypes.DEFAULT_TYPE):
         threshold = settings_manager.get("SIGNAL_THRESHOLD")
 
         df = data_fetcher.fetch_ohlc(symbol=symbol, interval=interval)
+        await _handle_rate_limit_recovered(context)
         df = indicators.compute_indicators(df)
         df = df.dropna().reset_index(drop=True)
 
@@ -190,6 +247,8 @@ async def analyze_market(context: ContextTypes.DEFAULT_TYPE):
             # qayta yuborilishi uchun holatni tozalaymiz.
             _last_decision["decision"] = None
 
+    except data_fetcher.RateLimitError as e:
+        await _handle_rate_limit(context, e)
     except Exception:
         logger.exception("analyze_market ichida xatolik yuz berdi")
 
@@ -200,6 +259,7 @@ async def update_weights_job(context: ContextTypes.DEFAULT_TYPE):
         interval = settings_manager.get("INTERVAL")
 
         df = data_fetcher.fetch_ohlc(symbol=symbol, interval=interval)
+        await _handle_rate_limit_recovered(context)
         df = indicators.compute_indicators(df).dropna().reset_index(drop=True)
         resolved = history_tracker.resolve_pending(
             df, lookahead_candles=config.OUTCOME_LOOKAHEAD_CANDLES
@@ -207,6 +267,8 @@ async def update_weights_job(context: ContextTypes.DEFAULT_TYPE):
         if resolved:
             new_weights = weights_manager.update_weights_from_outcomes(resolved)
             logger.info("Og'irliklar yangilandi: %s", new_weights)
+    except data_fetcher.RateLimitError as e:
+        await _handle_rate_limit(context, e)
     except Exception:
         logger.exception("update_weights_job ichida xatolik yuz berdi")
 
@@ -240,6 +302,9 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("settings", settings_command))
+    # Pastdagi doimiy tugmalar bosilganda ham xuddi shu buyruqlar ishlaydi.
+    application.add_handler(MessageHandler(filters.Text([BTN_STATUS]), status_command))
+    application.add_handler(MessageHandler(filters.Text([BTN_SETTINGS]), settings_command))
     application.add_handler(CallbackQueryHandler(settings_callback, pattern=r"^set:"))
     application.add_handler(CallbackQueryHandler(close_settings_callback, pattern=r"^close$"))
     application.add_handler(CallbackQueryHandler(noop_callback, pattern=r"^noop$"))

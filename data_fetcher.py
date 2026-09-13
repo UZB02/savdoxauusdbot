@@ -9,7 +9,18 @@ TWELVEDATA_URL = "https://api.twelvedata.com/time_series"
 
 
 class DataFetchError(Exception):
+    """Twelve Data'dan umumiy xatolik qaytganda ko'tariladi."""
     pass
+
+
+class RateLimitError(DataFetchError):
+    """Twelve Data API so'rovlar limiti (kunlik/daqiqalik) tugaganda ko'tariladi."""
+    pass
+
+
+# Twelve Data limit tugaganda xabarida odatda shu so'zlar uchraydi
+# (masalan "You have run out of API credits for the current ...").
+_RATE_LIMIT_HINTS = ("api credit", "run out of api", "limit")
 
 
 def fetch_ohlc(symbol: str = None, interval: str = None, outputsize: int = 200) -> pd.DataFrame:
@@ -32,7 +43,11 @@ def fetch_ohlc(symbol: str = None, interval: str = None, outputsize: int = 200) 
     data = resp.json()
 
     if data.get("status") == "error" or "values" not in data:
-        raise DataFetchError(f"Twelve Data xatosi: {data.get('message', data)}")
+        message = str(data.get("message", data))
+        code = data.get("code")
+        if code == 429 or any(hint in message.lower() for hint in _RATE_LIMIT_HINTS):
+            raise RateLimitError(f"Twelve Data API limiti tugadi: {message}")
+        raise DataFetchError(f"Twelve Data xatosi: {message}")
 
     df = pd.DataFrame(data["values"])
     df = df.rename(columns={"datetime": "datetime"})
