@@ -1,0 +1,15 @@
+[Unit]
+Description=Gold Signal Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+# Serverdagi loyiha papkasi manzilini shu yerga yozing:
+WorkingDirectory=/home/ubuntu/gold_signal_bot
+ExecStart=/usr/bin/python3 /home/ubuntu/gold_signal_bot/main.py
+Restart=always
+RestartSec=10
+User=ubuntu
+
+[Install]
+WantedBy=multi-user.target
