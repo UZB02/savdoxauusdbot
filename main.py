@@ -41,6 +41,7 @@ import history_tracker
 import chat_registry
 import settings_manager
 import ui_settings
+import session_filter
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -221,27 +222,37 @@ async def analyze_market(context: ContextTypes.DEFAULT_TYPE):
         )
 
         if decision != "NEUTRAL" and decision != _last_decision["decision"]:
-            levels = trade_planner.compute_trade_levels(
-                decision=decision, price=last_row["close"], atr=last_row["atr"]
-            )
+            if not session_filter.is_active_session(last_row["datetime"]):
+                # Past likvidlik soatida (sessiya filtri) — signal chiqdi,
+                # lekin yubormaymiz. _last_decision ni ATAYLAB o'zgartirmaymiz:
+                # shunda faol sessiya boshlanganda, agar qaror hamon shu
+                # bo'lsa, u holda darhol (qayta hisoblanmasdan) yuboriladi.
+                logger.info(
+                    "Signal %s chiqdi, lekin sessiya filtri tufayli o'tkazib yuborildi (vaqt: %s UTC)",
+                    decision, last_row["datetime"],
+                )
+            else:
+                levels = trade_planner.compute_trade_levels(
+                    decision=decision, price=last_row["close"], atr=last_row["atr"]
+                )
 
-            history_tracker.log_signal(
-                decision=decision,
-                score=score,
-                votes=votes.as_dict(),
-                price=last_row["close"],
-                candle_datetime=last_row["datetime"],
-            )
+                history_tracker.log_signal(
+                    decision=decision,
+                    score=score,
+                    votes=votes.as_dict(),
+                    price=last_row["close"],
+                    candle_datetime=last_row["datetime"],
+                )
 
-            message = format_signal_message(
-                decision, score, votes, last_row["close"], last_row["datetime"],
-                levels, symbol, threshold,
-            )
-            chat_ids = chat_registry.load_chat_ids()
-            for chat_id in chat_ids:
-                await context.bot.send_message(chat_id=chat_id, text=message)
+                message = format_signal_message(
+                    decision, score, votes, last_row["close"], last_row["datetime"],
+                    levels, symbol, threshold,
+                )
+                chat_ids = chat_registry.load_chat_ids()
+                for chat_id in chat_ids:
+                    await context.bot.send_message(chat_id=chat_id, text=message)
 
-            _last_decision["decision"] = decision
+                _last_decision["decision"] = decision
         elif decision == "NEUTRAL":
             # Bozor "kutish" holatida bo'lsa, keyingi kuchli signal
             # qayta yuborilishi uchun holatni tozalaymiz.

@@ -15,6 +15,7 @@ CHECK_EVERY_OPTIONS = [
 THRESHOLD_OPTIONS = [1.5, 2.0, 2.5, 3.0, 3.5]
 SL_OPTIONS = [1.0, 1.5, 2.0, 2.5]
 TP_OPTIONS = [2.0, 3.0, 4.0, 5.0]
+SESSION_FILTER_OPTIONS = [(1, "🟢 Yoqilgan"), (0, "🔴 O'chirilgan")]
 
 
 def _row(key, options_with_labels, current):
@@ -52,6 +53,9 @@ def build_settings_keyboard() -> InlineKeyboardMarkup:
         _header("— Take Profit (x ATR) —"),
         _row("TP_ATR_MULTIPLIER", [(v, str(v)) for v in TP_OPTIONS], s["TP_ATR_MULTIPLIER"]),
 
+        _header("— Sessiya filtri (07-21 UTC, past likvidlik soatlarida signal to'xtatiladi) —"),
+        _row("SESSION_FILTER_ENABLED", SESSION_FILTER_OPTIONS, s["SESSION_FILTER_ENABLED"]),
+
         [InlineKeyboardButton("✅ Yopish", callback_data="close")],
     ]
     return InlineKeyboardMarkup(rows)
@@ -66,6 +70,8 @@ def format_settings_text() -> str:
         f"🔄 Tekshirish chastotasi: {s['CHECK_EVERY_SECONDS']} soniya\n"
         f"🎯 Signal chegarasi: {s['SIGNAL_THRESHOLD']}\n"
         f"🛑 Stop Loss: {s['SL_ATR_MULTIPLIER']} x ATR\n"
-        f"🏁 Take Profit: {s['TP_ATR_MULTIPLIER']} x ATR\n\n"
+        f"🏁 Take Profit: {s['TP_ATR_MULTIPLIER']} x ATR\n"
+        f"🕰 Sessiya filtri: {'Yoqilgan' if s['SESSION_FILTER_ENABLED'] else 'O`chirilgan'} "
+        f"({s['SESSION_START_HOUR_UTC']:02d}:00–{s['SESSION_END_HOUR_UTC']:02d}:00 UTC)\n\n"
         "Quyidagi tugmalar orqali o'zgartiring — darhol kuchga kiradi:"
     )

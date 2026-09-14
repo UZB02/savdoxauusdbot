@@ -20,6 +20,11 @@ DEFAULTS = {
     "TP_ATR_MULTIPLIER": config.TP_ATR_MULTIPLIER,
     "ENTRY_ZONE_ATR_FRACTION": config.ENTRY_ZONE_ATR_FRACTION,
     "WEIGHT_UPDATE_EVERY_SECONDS": config.WEIGHT_UPDATE_EVERY_SECONDS,
+    # 1 = yoqilgan, 0 = o'chirilgan (int sifatida saqlanadi, bool emas —
+    # Telegram tugmasidan keladigan "0"/"1" satrini to'g'ri o'girish uchun).
+    "SESSION_FILTER_ENABLED": config.SESSION_FILTER_ENABLED,
+    "SESSION_START_HOUR_UTC": config.SESSION_START_HOUR_UTC,
+    "SESSION_END_HOUR_UTC": config.SESSION_END_HOUR_UTC,
 }
 
 # Har bir sozlama qanday turga (int, float, str) o'girilishi kerakligini

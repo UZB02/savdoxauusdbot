@@ -37,6 +37,10 @@ def fetch_ohlc(symbol: str = None, interval: str = None, outputsize: int = 200) 
         "outputsize": outputsize,
         "apikey": config.TWELVEDATA_API_KEY,
         "format": "JSON",
+        # Har doim UTC bo'yicha so'raymiz, shunda "datetime" ustuni aniq
+        # bitta vaqt mintaqasiga bog'lanadi (sessiya filtri UTC soatlariga
+        # tayanadi — session_filter.py ga qarang).
+        "timezone": "UTC",
     }
 
     resp = requests.get(TWELVEDATA_URL, params=params, timeout=20)

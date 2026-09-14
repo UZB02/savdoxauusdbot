@@ -24,6 +24,14 @@ TP_ATR_MULTIPLIER = float(os.getenv("TP_ATR_MULTIPLIER", "3.0"))
 # Kirish zonasi kengligi = ATR * shu ulush (masalan 0.1 = ATR ning 10%)
 ENTRY_ZONE_ATR_FRACTION = float(os.getenv("ENTRY_ZONE_ATR_FRACTION", "0.1"))
 
+# Sessiya filtri: London/Nyu-York savdo soatlaridan tashqarida (odatda past
+# likvidlik, ko'proq "shovqin" bo'ladigan sof Osiyo sessiyasida) signal
+# chiqarishni to'xtatib turadi. Soatlar UTC bo'yicha (data_fetcher.py
+# ma'lumotni har doim UTC formatida so'raydi).
+SESSION_FILTER_ENABLED = int(os.getenv("SESSION_FILTER_ENABLED", "1"))
+SESSION_START_HOUR_UTC = int(os.getenv("SESSION_START_HOUR_UTC", "7"))
+SESSION_END_HOUR_UTC = int(os.getenv("SESSION_END_HOUR_UTC", "21"))
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)

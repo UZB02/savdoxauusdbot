@@ -8,9 +8,14 @@ Mantiq: ATR bozorning "o'rtacha kunlik/soatlik tebranish kengligini" ko'rsatadi.
 Shuni asos qilib Stop Loss va Take Profit narxdan necha ATR uzoqlikda
 qo'yilishini belgilaymiz. Bu bozor notinch bo'lganda darajalarni kengroq,
 tinch bo'lganda torroq qilib avtomatik moslashtiradi.
+
+Koeffitsientlar settings_manager orqali o'qiladi (.env dagi qiymatlar
+standart bo'lib xizmat qiladi), shunda Telegram'dagi /settings orqali
+Stop Loss / Take Profit tugmalarini bosish darhol kuchga kiradi — botni
+qayta ishga tushirish shart emas.
 """
 from dataclasses import dataclass
-import config
+import settings_manager
 
 
 @dataclass
@@ -25,15 +30,29 @@ class TradeLevels:
     risk_reward_ratio: float
 
 
-def compute_trade_levels(decision: str, price: float, atr: float) -> TradeLevels:
+def compute_trade_levels(decision: str, price: float, atr: float,
+                          sl_mult: float = None, tp_mult: float = None,
+                          entry_fraction: float = None) -> TradeLevels:
     """
     decision: "BUY" yoki "SELL"
     price: signal chiqqan paytdagi narx (oxirgi close)
     atr: shu paytdagi ATR (14) qiymati
+
+    sl_mult / tp_mult / entry_fraction: berilmasa (None), joriy
+    /settings qiymati (settings_manager orqali) ishlatiladi. Bu
+    parametrlar asosan backtest.py kabi skriptlarga aniq bir qiymatni
+    majburlash imkonini berish uchun mavjud.
     """
-    entry_buffer = atr * config.ENTRY_ZONE_ATR_FRACTION
-    sl_distance = atr * config.SL_ATR_MULTIPLIER
-    tp_distance = atr * config.TP_ATR_MULTIPLIER
+    if sl_mult is None:
+        sl_mult = settings_manager.get("SL_ATR_MULTIPLIER")
+    if tp_mult is None:
+        tp_mult = settings_manager.get("TP_ATR_MULTIPLIER")
+    if entry_fraction is None:
+        entry_fraction = settings_manager.get("ENTRY_ZONE_ATR_FRACTION")
+
+    entry_buffer = atr * entry_fraction
+    sl_distance = atr * sl_mult
+    tp_distance = atr * tp_mult
 
     entry_low = price - entry_buffer
     entry_high = price + entry_buffer
