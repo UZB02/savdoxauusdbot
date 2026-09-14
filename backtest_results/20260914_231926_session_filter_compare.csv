@@ -1,3 +1,0 @@
-session_filter,total_trades,resolved_trades,sl_hits,tp_hits,timeouts,win_rate_pct,total_r_multiple,avg_r_multiple,profit_factor,max_drawdown_r,skipped_by_session
-False,1581,1581,788,37,756,13.7,-807.51,-0.511,0.1,-825.33,0
-True,938,938,501,22,415,12.4,-507.65,-0.541,0.1,-514.47,663
