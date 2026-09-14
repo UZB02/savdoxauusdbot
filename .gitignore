@@ -34,3 +34,4 @@ data/
 
 # Local config overrides
 config_local.py
+backtest_results
